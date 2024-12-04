@@ -1,0 +1,20 @@
+# Rust build directory
+/target/
+
+# Rust lock file (you might want to keep this for reproducible builds)
+# Cargo.lock
+
+# Backup files
+**/*.rs.bk
+
+# Remove macOS system files
+.DS_Store
+
+# Debug file
+*.pdb
+
+# Environment variables
+.env
+
+# Theme cache file
+.theme_cache.json 

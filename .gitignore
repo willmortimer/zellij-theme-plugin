@@ -1,6 +1,9 @@
 # Rust build directory
 /target/
 
+# VSCode
+.vscode/
+
 # Rust lock file (you might want to keep this for reproducible builds)
 # Cargo.lock
 

@@ -1,20 +1,16 @@
 mod data;
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use data::ThemeData;
-use std::io;
-use tui::{
-    backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
-    text::{Span, Spans},
+use ratatui::{
+    prelude::*,
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
-    Terminal,
 };
+use std::io;
 
 struct App {
     themes: Vec<String>,
@@ -116,36 +112,33 @@ pub async fn run_theme_selector() -> io::Result<()> {
     Ok(())
 }
 
-fn run_app<B: tui::backend::Backend>(
+fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
     theme_data: ThemeData,
 ) -> io::Result<()> {
     loop {
-        terminal.draw(|f| {
+        terminal.draw(|frame| {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(1)
-                .constraints(
-                    [
-                        Constraint::Length(3),  // Status
-                        Constraint::Min(1),     // List
-                    ]
-                    .as_ref(),
-                )
-                .split(f.size());
+                .constraints([
+                    Constraint::Length(3),  // Status
+                    Constraint::Min(1),     // List
+                ])
+                .split(frame.size());
 
             // Status message
-            let status = Paragraph::new(app.status_message.as_ref())
+            let status = Paragraph::new(app.status_message.clone())
                 .block(Block::default().borders(Borders::ALL).title("Status"));
-            f.render_widget(status, chunks[0]);
+            frame.render_widget(status, chunks[0]);
 
             // Theme list
             let items: Vec<ListItem> = app
                 .themes
                 .iter()
                 .map(|theme| {
-                    ListItem::new(Spans::from(vec![Span::styled(
+                    ListItem::new(Line::from(vec![Span::styled(
                         theme,
                         Style::default().add_modifier(Modifier::BOLD),
                     )]))
@@ -154,31 +147,37 @@ fn run_app<B: tui::backend::Backend>(
 
             let themes = List::new(items)
                 .block(Block::default().borders(Borders::ALL).title("Themes"))
-                .highlight_style(Style::default().bg(Color::LightGreen).add_modifier(Modifier::BOLD))
+                .highlight_style(
+                    Style::default()
+                        .bg(Color::Green)
+                        .add_modifier(Modifier::BOLD),
+                )
                 .highlight_symbol("> ");
 
-            f.render_stateful_widget(themes, chunks[1], &mut app.state);
+            frame.render_stateful_widget(themes, chunks[1], &mut app.state);
         })?;
 
         if let Event::Key(key) = event::read()? {
-            match key.code {
-                KeyCode::Char('q') => return Ok(()),
-                KeyCode::Down | KeyCode::Char('j') => app.next(),
-                KeyCode::Up | KeyCode::Char('k') => app.previous(),
-                KeyCode::Enter => {
-                    if let Some(selected) = app.state.selected() {
-                        let theme = &app.themes[selected];
-                        match theme_data.update_config(theme) {
-                            Ok(_) => {
-                                app.status_message = format!("Successfully applied theme: {}", theme);
-                            }
-                            Err(e) => {
-                                app.status_message = format!("Error updating config: {}", e);
+            if key.kind == KeyEventKind::Press {
+                match key.code {
+                    KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Down | KeyCode::Char('j') => app.next(),
+                    KeyCode::Up | KeyCode::Char('k') => app.previous(),
+                    KeyCode::Enter => {
+                        if let Some(selected) = app.state.selected() {
+                            let theme = &app.themes[selected];
+                            match theme_data.update_config(theme) {
+                                Ok(_) => {
+                                    app.status_message = format!("Successfully applied theme: {}", theme);
+                                }
+                                Err(e) => {
+                                    app.status_message = format!("Error updating config: {}", e);
+                                }
                             }
                         }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
         }
     }

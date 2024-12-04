@@ -1,6 +1,10 @@
 # Zellij Theme Selector Plugin
 
+<<<<<<< HEAD
 A terminal user interface (TUI) plugin for [Zellij](https://github.com/zellij-org/zellij) that allows you to preview and switch between themes in real-time.
+=======
+A terminal user interface (TUI) plugin for [Zellij](https://github.com/zellij-org/zellij) that allows you to preview and switch between themes in real-time. 
+>>>>>>> b6f5dc0aeb099e2d568e472ebbb0973623363147
 
 ## Features
 
@@ -58,13 +62,19 @@ The plugin is implemented in Rust and uses:
 ### Architecture
 
 1. **Theme Discovery**
+<<<<<<< HEAD
 
+=======
+>>>>>>> b6f5dc0aeb099e2d568e472ebbb0973623363147
    - Fetches themes from Zellij's GitHub repository
    - Parses KDL theme files to extract theme names
    - Caches results locally with hourly expiration
 
 2. **Configuration Management**
+<<<<<<< HEAD
 
+=======
+>>>>>>> b6f5dc0aeb099e2d568e472ebbb0973623363147
    - Automatically locates Zellij config file
    - Uses KDL parser for safe config modifications
    - Creates theme directory if needed

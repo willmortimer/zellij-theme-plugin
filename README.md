@@ -4,7 +4,6 @@
 A terminal user interface (TUI) plugin for [Zellij](https://github.com/zellij-org/zellij) that allows you to preview and switch between themes in real-time.
 =======
 A terminal user interface (TUI) plugin for [Zellij](https://github.com/zellij-org/zellij) that allows you to preview and switch between themes in real-time. 
->>>>>>> b6f5dc0aeb099e2d568e472ebbb0973623363147
 
 ## Features
 

@@ -6,11 +6,11 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use data::ThemeData;
-use std::{env, io};
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
 };
+use std::{env, io};
 
 struct App {
     themes: Vec<String>,
@@ -127,8 +127,8 @@ fn run_app<B: Backend>(
                 .direction(Direction::Vertical)
                 .margin(1)
                 .constraints([
-                    Constraint::Length(3),  // Status
-                    Constraint::Min(1),     // List
+                    Constraint::Length(3), // Status
+                    Constraint::Min(1),    // List
                 ])
                 .split(frame.size());
 
@@ -172,7 +172,8 @@ fn run_app<B: Backend>(
                             let theme = &app.themes[selected];
                             match theme_data.update_config(theme) {
                                 Ok(_) => {
-                                    app.status_message = format!("Successfully applied theme: {}", theme);
+                                    app.status_message =
+                                        format!("Successfully applied theme: {}", theme);
                                 }
                                 Err(e) => {
                                     app.status_message = format!("Error updating config: {}", e);
@@ -185,4 +186,4 @@ fn run_app<B: Backend>(
             }
         }
     }
-} 
+}

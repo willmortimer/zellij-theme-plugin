@@ -1,14 +1,15 @@
-use std::fs;
-use std::path::PathBuf;
-use std::io;
 use std::env;
-use reqwest;
+use std::fs;
+use std::io;
+use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
-use serde_json::Value;
-use kdl::{KdlDocument, KdlNode};
 
-const GITHUB_API_URL: &str = "https://api.github.com/repos/zellij-org/zellij/contents/zellij-utils/assets/themes";
-const CACHE_DURATION: Duration = Duration::from_secs(3600); // 1 hour
+use kdl::{KdlDocument, KdlNode};
+use serde::Deserialize;
+
+pub const GITHUB_API_URL: &str =
+    "https://api.github.com/repos/zellij-org/zellij/contents/zellij-utils/assets/themes";
+pub const CACHE_DURATION: Duration = Duration::from_secs(3600); // 1 hour
 
 pub struct ThemeData {
     config_path: PathBuf,
@@ -22,12 +23,19 @@ struct CacheData {
     timestamp: u64,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct GithubFile {
+    pub name: String,
+    #[serde(default)]
+    pub download_url: Option<String>,
+}
+
 impl ThemeData {
     pub fn new() -> io::Result<Self> {
         let config_path = Self::get_config_path()?;
         let theme_dir = config_path.parent().unwrap().join("themes");
         let cache_path = config_path.parent().unwrap().join(".theme_cache.json");
-        
+
         Ok(Self {
             config_path,
             theme_dir,
@@ -44,23 +52,29 @@ impl ThemeData {
         }
     }
 
-    fn read_cache(&self) -> Option<CacheData> {
-        if let Ok(content) = fs::read_to_string(&self.cache_path) {
-            if let Ok(cache) = serde_json::from_str::<CacheData>(&content) {
-                let now = SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs();
-                
-                if now - cache.timestamp < CACHE_DURATION.as_secs() {
-                    return Some(cache);
+    pub fn read_cache(&self) -> io::Result<Option<Vec<String>>> {
+        match fs::read_to_string(&self.cache_path) {
+            Ok(content) => match serde_json::from_str::<CacheData>(&content) {
+                Ok(cache) => {
+                    let now = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
+
+                    if now - cache.timestamp < CACHE_DURATION.as_secs() {
+                        Ok(Some(cache.themes))
+                    } else {
+                        Ok(None)
+                    }
                 }
-            }
+                Err(err) => Err(io::Error::new(io::ErrorKind::Other, err)),
+            },
+            Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(err) => Err(err),
         }
-        None
     }
 
-    fn write_cache(&self, themes: &[String]) -> io::Result<()> {
+    pub fn write_cache(&self, themes: &[String]) -> io::Result<()> {
         let cache = CacheData {
             themes: themes.to_vec(),
             timestamp: SystemTime::now()
@@ -68,13 +82,13 @@ impl ThemeData {
                 .unwrap()
                 .as_secs(),
         };
-        
+
         let content = serde_json::to_string(&cache)?;
         fs::write(&self.cache_path, content)?;
         Ok(())
     }
 
-    fn extract_themes_from_kdl(content: &str) -> Vec<String> {
+    pub fn extract_themes_from_kdl(content: &str) -> Vec<String> {
         if let Ok(doc) = content.parse::<KdlDocument>() {
             // Look for the themes node
             if let Some(themes_node) = doc.get("themes") {
@@ -92,60 +106,6 @@ impl ThemeData {
         Vec::new()
     }
 
-    pub async fn fetch_themes(force_refresh: bool) -> io::Result<Vec<String>> {
-        let instance = Self::new()?;
-        
-        // Try to read from cache first unless force refresh is requested
-        if !force_refresh {
-            if let Some(cache) = instance.read_cache() {
-                return Ok(cache.themes);
-            }
-        }
-        
-        // Fetch from GitHub
-        let client = reqwest::Client::new();
-        let response = client
-            .get(GITHUB_API_URL)
-            .header("User-Agent", "zellij-theme-plugin")
-            .send()
-            .await
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-            
-        let files: Vec<Value> = response
-            .json()
-            .await
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-            
-        let mut themes = Vec::new();
-        
-        // Process each file
-        for file in files {
-            if let Some(name) = file["name"].as_str() {
-                if name.ends_with(".kdl") {
-                    // Get the raw content URL
-                    if let Some(download_url) = file["download_url"].as_str() {
-                        // Download and parse the KDL file
-                        if let Ok(content) = client.get(download_url).send().await {
-                            if let Ok(text) = content.text().await {
-                                // Parse the KDL file and extract theme names
-                                themes.extend(Self::extract_themes_from_kdl(&text));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-            
-        // Add default theme and sort
-        themes.push("default".to_string());
-        themes.sort();
-        
-        // Cache the results
-        instance.write_cache(&themes)?;
-        
-        Ok(themes)
-    }
-
     pub fn ensure_theme_dir(&self) -> io::Result<()> {
         if !self.theme_dir.exists() {
             fs::create_dir_all(&self.theme_dir)?;
@@ -156,7 +116,9 @@ impl ThemeData {
 
     pub fn update_config(&self, selected_theme: &str) -> io::Result<()> {
         let content = fs::read_to_string(&self.config_path)?;
-        let mut doc: KdlDocument = content.parse().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let mut doc: KdlDocument = content
+            .parse()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
         // Update or add theme node
         if let Some(theme_node) = doc.get_mut("theme") {
@@ -175,4 +137,4 @@ impl ThemeData {
         fs::write(&self.config_path, doc.to_string())?;
         Ok(())
     }
-} 
+}

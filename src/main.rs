@@ -14,19 +14,25 @@ use ratatui::{
 
 struct App {
     themes: Vec<String>,
+    local_themes: std::collections::HashSet<String>,
     state: ListState,
     status_message: String,
 }
 
 impl App {
-    fn new(themes: Vec<String>) -> App {
+    fn new(themes: Vec<String>, local_themes: std::collections::HashSet<String>) -> App {
         let mut state = ListState::default();
         state.select(Some(0));
         App {
             themes,
+            local_themes,
             state,
-            status_message: String::from("Press Enter to apply theme, q to quit"),
+            status_message: String::from("↑/↓ navigate, Enter apply, q quit | ★ = local theme"),
         }
+    }
+
+    fn is_local(&self, theme: &str) -> bool {
+        self.local_themes.contains(theme)
     }
 
     fn next(&mut self) {
@@ -88,8 +94,8 @@ async fn main() -> Result<(), io::Error> {
     }
 
     // Fetch available themes
-    let themes = match ThemeData::fetch_themes(force_refresh).await {
-        Ok(themes) => themes,
+    let (themes, local_themes) = match ThemeData::fetch_themes_with_local_info(force_refresh).await {
+        Ok(result) => result,
         Err(e) => {
             disable_raw_mode()?;
             println!("Error fetching themes: {}", e);
@@ -97,7 +103,7 @@ async fn main() -> Result<(), io::Error> {
         }
     };
 
-    let mut app = App::new(themes);
+    let mut app = App::new(themes, local_themes);
     let res = run_app(&mut terminal, &mut app, theme_data);
 
     // Restore terminal
@@ -142,8 +148,13 @@ fn run_app<B: Backend>(
                 .themes
                 .iter()
                 .map(|theme| {
+                    let display = if app.is_local(theme) {
+                        format!("★ {}", theme)
+                    } else {
+                        format!("  {}", theme)
+                    };
                     ListItem::new(Line::from(vec![Span::styled(
-                        theme,
+                        display,
                         Style::default().add_modifier(Modifier::BOLD),
                     )]))
                 })
@@ -185,4 +196,4 @@ fn run_app<B: Backend>(
             }
         }
     }
-} 
+}
